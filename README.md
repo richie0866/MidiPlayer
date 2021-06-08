@@ -26,7 +26,6 @@ The circular button nxet to the title toggles midi visualization, as larger file
 ## Drawbacks
 
 * Executes from start to finish, including all code execution and `require` calls, in 80ms in Synapse-X
-  * Other exploits may experience faster loading times
-  * Mostly resulting from Promise usage in Rostruct
+  * There is much room for improvement, though loading times vary between script executors
 
 Want to make a contribution to Rostruct? [See the repository here](https://github.com/richie0866/Rostruct)
