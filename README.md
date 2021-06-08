@@ -1,5 +1,6 @@
 # MidiPlayer
- Virtual piano midi file autoplayer for Roblox
+
+Virtual piano midi file autoplayer for Roblox
 
 ## Install
 
@@ -13,4 +14,4 @@ To play midi files, simply add them to the `midi/` folder in your exploit's work
 
 Your midi files will be accessible in the UI:
 
-![MidiPlayer recording](img/midi-player-rec.mp4)
+https://user-images.githubusercontent.com/74037129/121129781-4ccd6e80-c7e2-11eb-8a59-561aebb2cf8b.mp4
