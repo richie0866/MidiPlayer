@@ -6,7 +6,7 @@ Virtual piano midi file autoplayer for Roblox
 
 To install MidiPlayer for your script executor, save the `package.lua` file located in this repository to your `scripts/` folder.
 
-## How to use
+## Usage
 
 To play midi files, simply add them to the `midi/` folder in your exploit's workspace directory.
 
@@ -15,3 +15,5 @@ To play midi files, simply add them to the `midi/` folder in your exploit's work
 Your midi files will be accessible in the UI:
 
 https://user-images.githubusercontent.com/74037129/121129781-4ccd6e80-c7e2-11eb-8a59-561aebb2cf8b.mp4
+
+The circular button to the top right of the interface toggles midi visualization, as larger files may cause framerate issues.
