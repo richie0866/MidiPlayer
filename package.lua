@@ -1,4 +1,4 @@
--- Rostruct v0.1.2-alpha
+-- Start of Rostruct v0.1.4-alpha
 
 --[[
 	Originally RuntimeLib.lua supplied by roblox-ts, modified for use when bundled.
@@ -255,327 +255,6 @@ function TS.await(promise)
 		error("The awaited Promise was cancelled", 2)
 	end
 end
-
--- out/core/buildProject.lua:
-TS.register("out/core/buildProject.lua", "buildProject", function()
-
-    -- Setup
-    local script = TS.get("out/core/buildProject.lua")
-
-    -- Start of buildProject
-
-    -- Compiled with roblox-ts v1.1.1
-	local TS = TS._G[script]
-	local Directory = TS.import(script, script.Parent.Parent, "utils", "filesystem").Directory
-	local Reconciler = TS.import(script, script.Parent, "Reconciler").Reconciler
-	local VirtualScript = TS.import(script, script.Parent, "VirtualScript").VirtualScript
-	--[[
-		*
-		* Builds the given project as a Roblox Instance tree.
-		* @param target The target files to build.
-		* @param parent Optional parent of the Instance tree.
-		* @returns A project interface.
-	]]
-	local function buildProject(target, parent)
-		local directory = Directory(target, target)
-		local reconciler = Reconciler.new(directory)
-		return {
-			Instance = reconciler:reify(parent),
-			Reconciler = reconciler,
-			Location = directory.location,
-		}
-	end
-	--[[
-		*
-		* Builds the given project and executes every tracked LocalScript.
-		* @param target The target files to build.
-		* @param parent Optional parent of the Instance tree.
-		* @returns A project interface.
-	]]
-	local function deployProject(target, parent)
-		local directory = Directory(target, target)
-		local reconciler = Reconciler.new(directory)
-		local instance = reconciler:reify(parent)
-		return {
-			Instance = instance,
-			Reconciler = reconciler,
-			Location = directory.location,
-			RuntimeWorker = reconciler:deployWorker(),
-		}
-	end
-	--[[
-		*
-		* Builds the given project and executes every tracked LocalScript.
-		* @param target The target files to build.
-		* @param parent Optional parent of the Instance tree.
-		* @returns A project interface.
-	]]
-	local function requireProject(target, parent)
-		local directory = Directory(target, target)
-		local reconciler = Reconciler.new(directory)
-		local instance = reconciler:reify(parent)
-		local _0 = instance:IsA("LuaSourceContainer")
-		local _1 = "Failed to require " .. directory.location .. " (Project is not a module)"
-		assert(_0, _1)
-		return {
-			Instance = instance,
-			Reconciler = reconciler,
-			Location = directory.location,
-			RuntimeWorker = reconciler:deployWorker(),
-			Module = VirtualScript:getFromInstance(instance):deferExecutor(),
-		}
-	end
-	return {
-		buildProject = buildProject,
-		deployProject = deployProject,
-		requireProject = requireProject,
-	}
-
-    -- End of buildProject
-
-end)
-
--- out/core/downloadAsset.lua:
-TS.register("out/core/downloadAsset.lua", "downloadAsset", function()
-
-    -- Setup
-    local script = TS.get("out/core/downloadAsset.lua")
-
-    -- Start of downloadAsset
-
-    -- Compiled with roblox-ts v1.1.1
-	local TS = TS._G[script]
-	local http = TS.import(script, script.Parent.Parent, "utils", "common", "http")
-	local makeFile = TS.import(script, script.Parent.Parent, "utils", "filesystem").makeFile
-	local extract = TS.import(script, script.Parent.Parent, "utils", "common", "extract").extract
-	--[[
-		*
-		* Downloads the asset file for a release.
-		* @param release The release to get the asset from.
-		* @param assetName Optional name of the asset. If not provided, the function returns the zipball URL.
-		* @returns The file data for an asset.
-	]]
-	local downloadAsset = TS.async(function(release, path, assetName)
-		local assetUrl
-		if assetName ~= nil then
-			local _0 = release.assets
-			local _1 = function(asset)
-				return asset.name == assetName
-			end
-			-- ▼ ReadonlyArray.find ▼
-			local _2 = nil
-			for _3, _4 in ipairs(_0) do
-				if _1(_4, _3 - 1, _0) == true then
-					_2 = _4
-					break
-				end
-			end
-			-- ▲ ReadonlyArray.find ▲
-			local asset = _2
-			local _3 = asset
-			local _4 = "Release '" .. release.name .. "' does not have asset '" .. assetName .. "'"
-			assert(_3, _4)
-			assetUrl = asset.browser_download_url
-		else
-			assetUrl = release.zipball_url
-		end
-		local response = TS.await(http.request({
-			Url = assetUrl,
-			Headers = {
-				["User-Agent"] = "rostruct",
-			},
-		}))
-		local _0 = response.Success
-		local _1 = response.StatusMessage
-		assert(_0, _1)
-		local _2
-		if assetName ~= nil and (string.match(assetName, "([^%.]+)$")) ~= "zip" then
-			_2 = makeFile(path .. assetName, response.Body)
-		else
-			_2 = extract(response.Body, path, assetName == nil)
-		end
-	end)
-	return {
-		downloadAsset = downloadAsset,
-	}
-
-    -- End of downloadAsset
-
-end)
-
--- out/core/downloadRelease.lua:
-TS.register("out/core/downloadRelease.lua", "downloadRelease", function()
-
-    -- Setup
-    local script = TS.get("out/core/downloadRelease.lua")
-
-    -- Start of downloadRelease
-
-    -- Compiled with roblox-ts v1.1.1
-	local TS = TS._G[script]
-	local openJson = TS.import(script, script.Parent.Parent, "utils", "common", "openJson").openJson
-	local _0 = TS.import(script, script.Parent.Parent, "utils", "github-release")
-	local getLatestRelease = _0.getLatestRelease
-	local getRelease = _0.getRelease
-	local identify = _0.identify
-	local downloadAsset = TS.import(script, script.Parent, "downloadAsset").downloadAsset
-	local fileManager = TS.import(script, script.Parent, "file-manager")
-	local cacheObject = openJson(fileManager.lintPath("rostruct/cache/release_tags.json"))
-	--[[
-		*
-		* Downloads a release from the given repository. If `assetName` is undefined, it downloads
-		* the source zip files and extracts them. Automatically extracts .zip files.
-		* This function does not download prereleases or drafts.
-		* @param owner The owner of the repository.
-		* @param repo The name of the repository.
-		* @param tag The release tag to download.
-		* @param assetName Optional asset to download. Defaults to the source files.
-		* @returns A download result interface.
-	]]
-	local downloadRelease = TS.async(function(owner, repo, tag, assetName)
-		local id = identify(owner, repo, tag, assetName)
-		local path = fileManager.lintPath("rostruct/cache/releases/", id) .. "/"
-		-- If the path is taken, don't download it again
-		if isfolder(path) then
-			return TS.Promise.resolve({
-				Location = path,
-				Tag = tag,
-				Updated = false,
-			})
-		end
-		local release = TS.await(getRelease(owner, repo, tag))
-		TS.await(downloadAsset(release, path, assetName))
-		return {
-			Location = path,
-			Tag = tag,
-			Updated = true,
-		}
-	end)
-	--[[
-		*
-		* Downloads the latest release from the given repository. If `assetName` is undefined,
-		* it downloads the source zip files and extracts them. Automatically extracts .zip files.
-		* This function does not download prereleases or drafts.
-		* @param owner The owner of the repository.
-		* @param repo The name of the repository.
-		* @param assetName Optional asset to download. Defaults to the source files.
-		* @returns A download result interface.
-	]]
-	local downloadLatestRelease = TS.async(function(owner, repo, assetName)
-		local id = identify(owner, repo, nil, assetName)
-		local path = fileManager.lintPath("rostruct/cache/releases/", id) .. "/"
-		local release = TS.await(getLatestRelease(owner, repo))
-		local cacheData = cacheObject:load()
-		-- Check if the cache is up-to-date
-		if cacheData[id] == release.tag_name and isfolder(path) then
-			return {
-				Location = path,
-				Tag = release.tag_name,
-				Updated = false,
-			}
-		end
-		-- Update the cache with the new tag
-		cacheData[id] = release.tag_name
-		cacheObject:save()
-		-- Make sure nothing is at the path before downloading!
-		if isfolder(path) then
-			delfolder(path)
-		end
-		-- Download the asset to the cache
-		TS.await(downloadAsset(release, path, assetName))
-		return {
-			Location = path,
-			Tag = release.tag_name,
-			Updated = true,
-		}
-	end)
-	-- * Clears the release cache.
-	local function clearReleaseCache()
-		delfolder(fileManager.lintPath("rostruct/cache/releases/"))
-		makefolder(fileManager.lintPath("rostruct/cache/releases/"))
-		writefile(fileManager.lintPath("rostruct/cache/release_tags.json"), "{}")
-	end
-	return {
-		downloadRelease = downloadRelease,
-		downloadLatestRelease = downloadLatestRelease,
-		clearReleaseCache = clearReleaseCache,
-	}
-
-    -- End of downloadRelease
-
-end)
-
--- out/core/file-manager.lua:
-TS.register("out/core/file-manager.lua", "file-manager", function()
-
-    -- Setup
-    local script = TS.get("out/core/file-manager.lua")
-
-    -- Start of file-manager
-
-    -- Compiled with roblox-ts v1.1.1
-	local TS = TS._G[script]
-	local makeFiles = TS.import(script, script.Parent.Parent, "utils", "filesystem").makeFiles
-	-- * Maps a list of files that handle Rostruct file storage.
-	local fileArray = { { "rostruct/", "" }, { "rostruct/cache/", "" }, { "rostruct/cache/releases/", "" }, { "rostruct/cache/release_tags.json", "{}" } }
-	--[[
-		*
-		* Gets the value of `dir .. file`. Mainly used with linting to flag unchanged files when changing paths.
-		* Might be bad practice! Let me know of better ways to do this.
-		* @param start The directory to index.
-		* @param path The local path.
-		* @returns A reference to the file.
-	]]
-	local function lintPath(start, path)
-		return path ~= nil and start .. path or start
-	end
-	-- * Initializes the file structure for Rostruct.
-	local function init()
-		makeFiles(fileArray)
-	end
-	return {
-		lintPath = lintPath,
-		init = init,
-	}
-
-    -- End of file-manager
-
-end)
-
--- out/core/init.lua:
-TS.register("out/core/init.lua", "init", function()
-
-    -- Setup
-    local script = TS.get("out/core/init.lua")
-
-    -- Start of init
-
-    -- Compiled with roblox-ts v1.1.1
-	local TS = TS._G[script]
-	local exports = {}
-	for _0, _1 in pairs(TS.import(script, script, "VirtualScript")) do
-		exports[_0] = _1
-	end
-	for _0, _1 in pairs(TS.import(script, script, "Reconciler")) do
-		exports[_0] = _1
-	end
-	for _0, _1 in pairs(TS.import(script, script, "buildProject")) do
-		exports[_0] = _1
-	end
-	for _0, _1 in pairs(TS.import(script, script, "downloadRelease")) do
-		exports[_0] = _1
-	end
-	for _0, _1 in pairs(TS.import(script, script, "file-manager")) do
-		exports[_0] = _1
-	end
-	for _0, _1 in pairs(TS.import(script, script, "types")) do
-		exports[_0] = _1
-	end
-	return exports
-
-    -- End of init
-
-end)
 
 -- out/core/Reconciler/init.lua:
 TS.register("out/core/Reconciler/init.lua", "init", function()
@@ -883,29 +562,6 @@ TS.register("out/core/Reconciler/transformFile.lua", "transformFile", function()
 
 end)
 
--- out/core/types.lua:
-TS.register("out/core/types.lua", "types", function()
-
-    -- Setup
-    local script = TS.get("out/core/types.lua")
-
-    -- Start of types
-
-    -- Compiled with roblox-ts v1.1.1
-	-- * A function that gets called when a VirtualScript is executed.
-	-- * Base environment for VirtualScript instances.
-	-- * Stores the results of project building functions.
-	-- * Information about the release being downloaded.
-	-- * Prevent the transpiled Lua code from returning nil!
-	local _ = nil
-	return {
-		_ = _,
-	}
-
-    -- End of types
-
-end)
-
 -- out/core/VirtualScript.lua:
 TS.register("out/core/VirtualScript.lua", "VirtualScript", function()
 
@@ -922,8 +578,6 @@ TS.register("out/core/VirtualScript.lua", "VirtualScript", function()
 		* Author: richard
 		* Description: Execute files as Roblox instances.
 	]]
-	local globals = TS.import(script, script.Parent.Parent, "globals").globals
-	local Object = TS.import(script, script.Parent.Parent, "packages", "object-utils")
 	local HttpService = TS.import(script, script.Parent.Parent, "packages", "services").HttpService
 	-- * Class used to execute files in a Roblox instance context.
 	local VirtualScript
@@ -966,28 +620,22 @@ TS.register("out/core/VirtualScript.lua", "VirtualScript", function()
 				-- ▼ Map.set ▼
 				_4[_5] = _6
 				-- ▲ Map.set ▲
+			else
+				local _4 = VirtualScript.virtualScriptsOfScope
+				local _5 = scope
+				local _6 = _4[_5]
+				local _7 = self
+				-- ▼ Array.push ▼
+				_6[#_6 + 1] = _7
+				-- ▲ Array.push ▲
 			end
-			-- Reserves globals for this VirtualScript's environent.
-			local _4 = globals.environments
-			local _5 = tostring(scope) .. "-" .. self.id
-			local _6 = self.env
+			-- Tracks this VirtualScript for external use.
+			local _4 = VirtualScript.virtualScriptsByInstance
+			local _5 = instance
+			local _6 = self
 			-- ▼ Map.set ▼
 			_4[_5] = _6
 			-- ▲ Map.set ▲
-			-- Tracks this VirtualScript for external use.
-			local _7 = VirtualScript.virtualScriptsByInstance
-			local _8 = instance
-			local _9 = self
-			-- ▼ Map.set ▼
-			_7[_8] = _9
-			-- ▲ Map.set ▲
-			local _10 = VirtualScript.virtualScriptsOfScope
-			local _11 = scope
-			local _12 = _10[_11]
-			local _13 = self
-			-- ▼ Array.push ▼
-			_12[#_12 + 1] = _13
-			-- ▲ Array.push ▲
 		end
 		function VirtualScript:getFromInstance(obj)
 			local _0 = self.virtualScriptsByInstance
@@ -1010,11 +658,7 @@ TS.register("out/core/VirtualScript.lua", "VirtualScript", function()
 			end
 		end
 		function VirtualScript:getSource()
-			local header = "local _ENV = getgenv().Rostruct.environments['" .. tostring(self.scope) .. "-" .. self.id .. "']; "
-			for _, k in ipairs(Object.keys(self.env)) do
-				header ..= "local " .. k .. " = _ENV['" .. k .. "']; "
-			end
-			return header .. readfile(self.file.location)
+			return "setfenv(1, setmetatable(..., { __index = getfenv(0) }));" .. readfile(self.file.location)
 		end
 		function VirtualScript:setExecutor(exec)
 			local _0 = self.jobComplete == false
@@ -1037,7 +681,7 @@ TS.register("out/core/VirtualScript.lua", "VirtualScript", function()
 			if self.jobComplete then
 				return self.result
 			end
-			local result = self:createExecutor()()
+			local result = self:createExecutor()(self.env)
 			-- Modules must return a value.
 			if self.instance:IsA("ModuleScript") then
 				local _0 = result
@@ -1061,6 +705,347 @@ TS.register("out/core/VirtualScript.lua", "VirtualScript", function()
 	}
 
     -- End of VirtualScript
+
+end)
+
+-- out/core/buildProject.lua:
+TS.register("out/core/buildProject.lua", "buildProject", function()
+
+    -- Setup
+    local script = TS.get("out/core/buildProject.lua")
+
+    -- Start of buildProject
+
+    -- Compiled with roblox-ts v1.1.1
+	local TS = TS._G[script]
+	local Directory = TS.import(script, script.Parent.Parent, "utils", "filesystem").Directory
+	local Reconciler = TS.import(script, script.Parent, "Reconciler").Reconciler
+	local VirtualScript = TS.import(script, script.Parent, "VirtualScript").VirtualScript
+	--[[
+		*
+		* Builds the given project as a Roblox Instance tree.
+		* @param target The target files to build.
+		* @param parent Optional parent of the Instance tree.
+		* @returns A project interface.
+	]]
+	local function buildProject(target, parent)
+		local directory = Directory(target, target)
+		local reconciler = Reconciler.new(directory)
+		return {
+			Instance = reconciler:reify(parent),
+			Location = directory.location,
+		}
+	end
+	--[[
+		*
+		* Builds the given project and executes every tracked LocalScript.
+		* @param target The target files to build.
+		* @param parent Optional parent of the Instance tree.
+		* @returns A project interface.
+	]]
+	local function deployProject(target, parent)
+		local directory = Directory(target, target)
+		local reconciler = Reconciler.new(directory)
+		local instance = reconciler:reify(parent)
+		return {
+			Instance = instance,
+			Location = directory.location,
+			RuntimeWorker = reconciler:deployWorker(),
+		}
+	end
+	--[[
+		*
+		* Builds the given project and executes every tracked LocalScript.
+		* @param target The target files to build.
+		* @param parent Optional parent of the Instance tree.
+		* @returns A project interface.
+	]]
+	local function requireProject(target, parent)
+		local directory = Directory(target, target)
+		local reconciler = Reconciler.new(directory)
+		local instance = reconciler:reify(parent)
+		local _0 = instance:IsA("LuaSourceContainer")
+		local _1 = "Failed to require " .. directory.location .. " (Project is not a module)"
+		assert(_0, _1)
+		return {
+			Instance = instance,
+			Location = directory.location,
+			RuntimeWorker = reconciler:deployWorker(),
+			Module = VirtualScript:getFromInstance(instance):deferExecutor(),
+		}
+	end
+	return {
+		buildProject = buildProject,
+		deployProject = deployProject,
+		requireProject = requireProject,
+	}
+
+    -- End of buildProject
+
+end)
+
+-- out/core/downloadAsset.lua:
+TS.register("out/core/downloadAsset.lua", "downloadAsset", function()
+
+    -- Setup
+    local script = TS.get("out/core/downloadAsset.lua")
+
+    -- Start of downloadAsset
+
+    -- Compiled with roblox-ts v1.1.1
+	local TS = TS._G[script]
+	local http = TS.import(script, script.Parent.Parent, "utils", "common", "http")
+	local makeFile = TS.import(script, script.Parent.Parent, "utils", "filesystem").makeFile
+	local extract = TS.import(script, script.Parent.Parent, "utils", "common", "extract").extract
+	--[[
+		*
+		* Downloads the asset file for a release.
+		* @param release The release to get the asset from.
+		* @param assetName Optional name of the asset. If not provided, the function returns the zipball URL.
+		* @returns The file data for an asset.
+	]]
+	local downloadAsset = TS.async(function(release, path, assetName)
+		local assetUrl
+		if assetName ~= nil then
+			local _0 = release.assets
+			local _1 = function(asset)
+				return asset.name == assetName
+			end
+			-- ▼ ReadonlyArray.find ▼
+			local _2 = nil
+			for _3, _4 in ipairs(_0) do
+				if _1(_4, _3 - 1, _0) == true then
+					_2 = _4
+					break
+				end
+			end
+			-- ▲ ReadonlyArray.find ▲
+			local asset = _2
+			local _3 = asset
+			local _4 = "Release '" .. release.name .. "' does not have asset '" .. assetName .. "'"
+			assert(_3, _4)
+			assetUrl = asset.browser_download_url
+		else
+			assetUrl = release.zipball_url
+		end
+		local response = TS.await(http.request({
+			Url = assetUrl,
+			Headers = {
+				["User-Agent"] = "rostruct",
+			},
+		}))
+		local _0 = response.Success
+		local _1 = response.StatusMessage
+		assert(_0, _1)
+		local _2
+		if assetName ~= nil and (string.match(assetName, "([^%.]+)$")) ~= "zip" then
+			_2 = makeFile(path .. assetName, response.Body)
+		else
+			_2 = extract(response.Body, path, assetName == nil)
+		end
+	end)
+	return {
+		downloadAsset = downloadAsset,
+	}
+
+    -- End of downloadAsset
+
+end)
+
+-- out/core/downloadRelease.lua:
+TS.register("out/core/downloadRelease.lua", "downloadRelease", function()
+
+    -- Setup
+    local script = TS.get("out/core/downloadRelease.lua")
+
+    -- Start of downloadRelease
+
+    -- Compiled with roblox-ts v1.1.1
+	local TS = TS._G[script]
+	local openJson = TS.import(script, script.Parent.Parent, "utils", "common", "openJson").openJson
+	local _0 = TS.import(script, script.Parent.Parent, "utils", "github-release")
+	local getLatestRelease = _0.getLatestRelease
+	local getRelease = _0.getRelease
+	local identify = _0.identify
+	local downloadAsset = TS.import(script, script.Parent, "downloadAsset").downloadAsset
+	local fileManager = TS.import(script, script.Parent, "file-manager")
+	local cacheObject = openJson(fileManager.lintPath("rostruct/cache/release_tags.json"))
+	--[[
+		*
+		* Downloads a release from the given repository. If `assetName` is undefined, it downloads
+		* the source zip files and extracts them. Automatically extracts .zip files.
+		* This function does not download prereleases or drafts.
+		* @param owner The owner of the repository.
+		* @param repo The name of the repository.
+		* @param tag The release tag to download.
+		* @param assetName Optional asset to download. Defaults to the source files.
+		* @returns A download result interface.
+	]]
+	local downloadRelease = TS.async(function(owner, repo, tag, assetName)
+		local id = identify(owner, repo, tag, assetName)
+		local path = fileManager.lintPath("rostruct/cache/releases/", id) .. "/"
+		-- If the path is taken, don't download it again
+		if isfolder(path) then
+			return TS.Promise.resolve({
+				Location = path,
+				Tag = tag,
+				Updated = false,
+			})
+		end
+		local release = TS.await(getRelease(owner, repo, tag))
+		TS.await(downloadAsset(release, path, assetName))
+		return {
+			Location = path,
+			Tag = tag,
+			Updated = true,
+		}
+	end)
+	--[[
+		*
+		* Downloads the latest release from the given repository. If `assetName` is undefined,
+		* it downloads the source zip files and extracts them. Automatically extracts .zip files.
+		* This function does not download prereleases or drafts.
+		* @param owner The owner of the repository.
+		* @param repo The name of the repository.
+		* @param assetName Optional asset to download. Defaults to the source files.
+		* @returns A download result interface.
+	]]
+	local downloadLatestRelease = TS.async(function(owner, repo, assetName)
+		local id = identify(owner, repo, nil, assetName)
+		local path = fileManager.lintPath("rostruct/cache/releases/", id) .. "/"
+		local release = TS.await(getLatestRelease(owner, repo))
+		local cacheData = cacheObject:load()
+		-- Check if the cache is up-to-date
+		if cacheData[id] == release.tag_name and isfolder(path) then
+			return {
+				Location = path,
+				Tag = release.tag_name,
+				Updated = false,
+			}
+		end
+		-- Update the cache with the new tag
+		cacheData[id] = release.tag_name
+		cacheObject:save()
+		-- Make sure nothing is at the path before downloading!
+		if isfolder(path) then
+			delfolder(path)
+		end
+		-- Download the asset to the cache
+		TS.await(downloadAsset(release, path, assetName))
+		return {
+			Location = path,
+			Tag = release.tag_name,
+			Updated = true,
+		}
+	end)
+	-- * Clears the release cache.
+	local function clearReleaseCache()
+		delfolder(fileManager.lintPath("rostruct/cache/releases/"))
+		makefolder(fileManager.lintPath("rostruct/cache/releases/"))
+		writefile(fileManager.lintPath("rostruct/cache/release_tags.json"), "{}")
+	end
+	return {
+		downloadRelease = downloadRelease,
+		downloadLatestRelease = downloadLatestRelease,
+		clearReleaseCache = clearReleaseCache,
+	}
+
+    -- End of downloadRelease
+
+end)
+
+-- out/core/file-manager.lua:
+TS.register("out/core/file-manager.lua", "file-manager", function()
+
+    -- Setup
+    local script = TS.get("out/core/file-manager.lua")
+
+    -- Start of file-manager
+
+    -- Compiled with roblox-ts v1.1.1
+	local TS = TS._G[script]
+	local makeFiles = TS.import(script, script.Parent.Parent, "utils", "filesystem").makeFiles
+	-- * Maps a list of files that handle Rostruct file storage.
+	local fileArray = { { "rostruct/", "" }, { "rostruct/cache/", "" }, { "rostruct/cache/releases/", "" }, { "rostruct/cache/release_tags.json", "{}" } }
+	--[[
+		*
+		* Gets the value of `dir .. file`. Mainly used with linting to flag unchanged files when changing paths.
+		* Might be bad practice! Let me know of better ways to do this.
+		* @param start The directory to index.
+		* @param path The local path.
+		* @returns A reference to the file.
+	]]
+	local function lintPath(start, path)
+		return path ~= nil and start .. path or start
+	end
+	-- * Initializes the file structure for Rostruct.
+	local function init()
+		makeFiles(fileArray)
+	end
+	return {
+		lintPath = lintPath,
+		init = init,
+	}
+
+    -- End of file-manager
+
+end)
+
+-- out/core/init.lua:
+TS.register("out/core/init.lua", "init", function()
+
+    -- Setup
+    local script = TS.get("out/core/init.lua")
+
+    -- Start of init
+
+    -- Compiled with roblox-ts v1.1.1
+	local TS = TS._G[script]
+	local exports = {}
+	for _0, _1 in pairs(TS.import(script, script, "VirtualScript")) do
+		exports[_0] = _1
+	end
+	for _0, _1 in pairs(TS.import(script, script, "Reconciler")) do
+		exports[_0] = _1
+	end
+	for _0, _1 in pairs(TS.import(script, script, "buildProject")) do
+		exports[_0] = _1
+	end
+	for _0, _1 in pairs(TS.import(script, script, "downloadRelease")) do
+		exports[_0] = _1
+	end
+	for _0, _1 in pairs(TS.import(script, script, "file-manager")) do
+		exports[_0] = _1
+	end
+	for _0, _1 in pairs(TS.import(script, script, "types")) do
+		exports[_0] = _1
+	end
+	return exports
+
+    -- End of init
+
+end)
+
+-- out/core/types.lua:
+TS.register("out/core/types.lua", "types", function()
+
+    -- Setup
+    local script = TS.get("out/core/types.lua")
+
+    -- Start of types
+
+    -- Compiled with roblox-ts v1.1.1
+	-- * A function that gets called when a VirtualScript is executed.
+	-- * Base environment for VirtualScript instances.
+	-- * Stores the results of project building functions.
+	-- * Information about the release being downloaded.
+	-- * Prevent the transpiled Lua code from returning nil!
+	local _ = nil
+	return {
+		_ = _,
+	}
+
+    -- End of types
 
 end)
 
@@ -1139,7 +1124,6 @@ TS.register("out/globals/rostruct-globals.lua", "rostruct-globals", function()
 	-- * Global environment reserved for Rostruct.
 	local globals = (getgenv().Rostruct) or {
 		currentScope = 0,
-		environments = {},
 	}
 	getgenv().Rostruct = globals
 	return {
@@ -1177,193 +1161,6 @@ TS.register("out/init.lua", "init", function()
 	-- Packages
 	local Promise = TS.import(script, script, "packages", "Promise")
 	return exports
-
-    -- End of init
-
-end)
-
--- out/packages/make/init.lua:
-TS.register("out/packages/make/init.lua", "init", function()
-
-    -- Setup
-    local script = TS.get("out/packages/make/init.lua")
-
-    -- Start of init
-
-    -- Compiled with roblox-ts v1.1.1
-	--[[
-		*
-		* Returns a table wherein an object's writable properties can be specified,
-		* while also allowing functions to be passed in which can be bound to a RBXScriptSignal.
-	]]
-	--[[
-		*
-		* Instantiates a new Instance of `className` with given `settings`,
-		* where `settings` is an object of the form { [K: propertyName]: value }.
-		*
-		* `settings.Children` is an array of child objects to be parented to the generated Instance.
-		*
-		* Events can be set to a callback function, which will be connected.
-		*
-		* `settings.Parent` is always set last.
-	]]
-	local function Make(className, settings)
-		local _0 = settings
-		local children = _0.Children
-		local parent = _0.Parent
-		local instance = Instance.new(className)
-		for setting, value in pairs(settings) do
-			if setting ~= "Children" and setting ~= "Parent" then
-				local _1 = instance
-				local prop = _1[setting]
-				local _2 = prop
-				if typeof(_2) == "RBXScriptSignal" then
-					prop:Connect(value)
-				else
-					instance[setting] = value
-				end
-			end
-		end
-		if children then
-			for _, child in ipairs(children) do
-				child.Parent = instance
-			end
-		end
-		instance.Parent = parent
-		return instance
-	end
-	return Make
-
-    -- End of init
-
-end)
-
--- out/packages/object-utils/init.lua:
-TS.register("out/packages/object-utils/init.lua", "init", function()
-
-    -- Setup
-    local script = TS.get("out/packages/object-utils/init.lua")
-
-    -- Start of init
-
-    local HttpService = game:GetService("HttpService")
-	
-	local Object = {}
-	
-	function Object.keys(object)
-		local result = table.create(#object)
-		for key in pairs(object) do
-			result[#result + 1] = key
-		end
-		return result
-	end
-	
-	function Object.values(object)
-		local result = table.create(#object)
-		for _, value in pairs(object) do
-			result[#result + 1] = value
-		end
-		return result
-	end
-	
-	function Object.entries(object)
-		local result = table.create(#object)
-		for key, value in pairs(object) do
-			result[#result + 1] = { key, value }
-		end
-		return result
-	end
-	
-	function Object.assign(toObj, ...)
-		for i = 1, select("#", ...) do
-			local arg = select(i, ...)
-			if type(arg) == "table" then
-				for key, value in pairs(arg) do
-					toObj[key] = value
-				end
-			end
-		end
-		return toObj
-	end
-	
-	function Object.copy(object)
-		local result = table.create(#object)
-		for k, v in pairs(object) do
-			result[k] = v
-		end
-		return result
-	end
-	
-	local function deepCopyHelper(object, encountered)
-		local result = table.create(#object)
-		encountered[object] = result
-	
-		for k, v in pairs(object) do
-			if type(k) == "table" then
-				k = encountered[k] or deepCopyHelper(k, encountered)
-			end
-	
-			if type(v) == "table" then
-				v = encountered[v] or deepCopyHelper(v, encountered)
-			end
-	
-			result[k] = v
-		end
-	
-		return result
-	end
-	
-	function Object.deepCopy(object)
-		return deepCopyHelper(object, {})
-	end
-	
-	function Object.deepEquals(a, b)
-		-- a[k] == b[k]
-		for k in pairs(a) do
-			local av = a[k]
-			local bv = b[k]
-			if type(av) == "table" and type(bv) == "table" then
-				local result = Object.deepEquals(av, bv)
-				if not result then
-					return false
-				end
-			elseif av ~= bv then
-				return false
-			end
-		end
-	
-		-- extra keys in b
-		for k in pairs(b) do
-			if a[k] == nil then
-				return false
-			end
-		end
-	
-		return true
-	end
-	
-	function Object.toString(data)
-		return HttpService:JSONEncode(data)
-	end
-	
-	function Object.isEmpty(object)
-		return next(object) == nil
-	end
-	
-	function Object.fromEntries(entries)
-		local entriesLen = #entries
-	
-		local result = table.create(entriesLen)
-		if entries then
-			for i = 1, entriesLen do
-				local pair = entries[i]
-				result[pair[1]] = pair[2]
-			end
-		end
-		return result
-	end
-	
-	return Object
 
     -- End of init
 
@@ -2784,6 +2581,193 @@ TS.register("out/packages/Promise/init.lua", "init", function()
 
 end)
 
+-- out/packages/make/init.lua:
+TS.register("out/packages/make/init.lua", "init", function()
+
+    -- Setup
+    local script = TS.get("out/packages/make/init.lua")
+
+    -- Start of init
+
+    -- Compiled with roblox-ts v1.1.1
+	--[[
+		*
+		* Returns a table wherein an object's writable properties can be specified,
+		* while also allowing functions to be passed in which can be bound to a RBXScriptSignal.
+	]]
+	--[[
+		*
+		* Instantiates a new Instance of `className` with given `settings`,
+		* where `settings` is an object of the form { [K: propertyName]: value }.
+		*
+		* `settings.Children` is an array of child objects to be parented to the generated Instance.
+		*
+		* Events can be set to a callback function, which will be connected.
+		*
+		* `settings.Parent` is always set last.
+	]]
+	local function Make(className, settings)
+		local _0 = settings
+		local children = _0.Children
+		local parent = _0.Parent
+		local instance = Instance.new(className)
+		for setting, value in pairs(settings) do
+			if setting ~= "Children" and setting ~= "Parent" then
+				local _1 = instance
+				local prop = _1[setting]
+				local _2 = prop
+				if typeof(_2) == "RBXScriptSignal" then
+					prop:Connect(value)
+				else
+					instance[setting] = value
+				end
+			end
+		end
+		if children then
+			for _, child in ipairs(children) do
+				child.Parent = instance
+			end
+		end
+		instance.Parent = parent
+		return instance
+	end
+	return Make
+
+    -- End of init
+
+end)
+
+-- out/packages/object-utils/init.lua:
+TS.register("out/packages/object-utils/init.lua", "init", function()
+
+    -- Setup
+    local script = TS.get("out/packages/object-utils/init.lua")
+
+    -- Start of init
+
+    local HttpService = game:GetService("HttpService")
+	
+	local Object = {}
+	
+	function Object.keys(object)
+		local result = table.create(#object)
+		for key in pairs(object) do
+			result[#result + 1] = key
+		end
+		return result
+	end
+	
+	function Object.values(object)
+		local result = table.create(#object)
+		for _, value in pairs(object) do
+			result[#result + 1] = value
+		end
+		return result
+	end
+	
+	function Object.entries(object)
+		local result = table.create(#object)
+		for key, value in pairs(object) do
+			result[#result + 1] = { key, value }
+		end
+		return result
+	end
+	
+	function Object.assign(toObj, ...)
+		for i = 1, select("#", ...) do
+			local arg = select(i, ...)
+			if type(arg) == "table" then
+				for key, value in pairs(arg) do
+					toObj[key] = value
+				end
+			end
+		end
+		return toObj
+	end
+	
+	function Object.copy(object)
+		local result = table.create(#object)
+		for k, v in pairs(object) do
+			result[k] = v
+		end
+		return result
+	end
+	
+	local function deepCopyHelper(object, encountered)
+		local result = table.create(#object)
+		encountered[object] = result
+	
+		for k, v in pairs(object) do
+			if type(k) == "table" then
+				k = encountered[k] or deepCopyHelper(k, encountered)
+			end
+	
+			if type(v) == "table" then
+				v = encountered[v] or deepCopyHelper(v, encountered)
+			end
+	
+			result[k] = v
+		end
+	
+		return result
+	end
+	
+	function Object.deepCopy(object)
+		return deepCopyHelper(object, {})
+	end
+	
+	function Object.deepEquals(a, b)
+		-- a[k] == b[k]
+		for k in pairs(a) do
+			local av = a[k]
+			local bv = b[k]
+			if type(av) == "table" and type(bv) == "table" then
+				local result = Object.deepEquals(av, bv)
+				if not result then
+					return false
+				end
+			elseif av ~= bv then
+				return false
+			end
+		end
+	
+		-- extra keys in b
+		for k in pairs(b) do
+			if a[k] == nil then
+				return false
+			end
+		end
+	
+		return true
+	end
+	
+	function Object.toString(data)
+		return HttpService:JSONEncode(data)
+	end
+	
+	function Object.isEmpty(object)
+		return next(object) == nil
+	end
+	
+	function Object.fromEntries(entries)
+		local entriesLen = #entries
+	
+		local result = table.create(entriesLen)
+		if entries then
+			for i = 1, entriesLen do
+				local pair = entries[i]
+				result[pair[1]] = pair[2]
+			end
+		end
+		return result
+	end
+	
+	return Object
+
+    -- End of init
+
+end)
+
 -- out/packages/services/init.lua:
 TS.register("out/packages/services/init.lua", "init", function()
 
@@ -3602,9 +3586,9 @@ TS.register("out/utils/filesystem/makeFiles.lua", "makeFiles", function()
 			if string.sub(path, -1) == "/" and not isfolder(path) then
 				local _1
 				if map then
-					_1 = makefolder(map(path))
+					_1 = makeFolder(map(path))
 				else
-					_1 = makefolder(path)
+					_1 = makeFolder(path)
 				end
 			elseif string.sub(path, -1) ~= "/" and not isfile(path) then
 				local _1
@@ -3841,8 +3825,7 @@ TS.register("out/utils/github-release/types.lua", "types", function()
 
 end)
 
-
--- End of Rostruct v0.1.2-alpha
+-- End of Rostruct v0.1.4-alpha
 
 local Rostruct = TS.initialize("init")
 
