@@ -1,6 +1,6 @@
 # MidiPlayer
 
-Virtual piano midi file autoplayer for Roblox
+Virtual piano midi file autoplayer for Roblox. I am no longer updating this script, but pull requests are welcome.
 
 ## Install
 
