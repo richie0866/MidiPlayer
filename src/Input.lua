@@ -6,6 +6,13 @@
 local Input = {}
 
 local vim = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
+
+if syn then
+	for i, v in pairs(getconnections(UserInputService.TextBoxFocused)) do
+   		v:Disable() 
+	end	
+end
 
 local NOTE_MAP = "1!2@34$5%6^78*9(0qQwWeErtTyYuiIoOpPasSdDfgGhHjJklLzZxcCvVbBnm"
 local UPPER_MAP = "!@ $%^ *( QWE TY IOP SD GHJ LZ CVB"
