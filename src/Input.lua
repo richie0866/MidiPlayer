@@ -8,8 +8,8 @@ local Input = {}
 local vim = game:GetService("VirtualInputManager")
 local UserInputService = game:GetService("UserInputService")
 
--- This allows you to type in chat while playing, but when you type in chat it makes you play notes. Not sure if it can be fixed. Still going to leave here in case anyone wants it
---if syn then
+-- This allows you to type in chat while playing, but when you type in chat the piano will play the notes you enter. Check pull request #5 for more info.
+--if getconnections then
 --	for i, v in pairs(getconnections(UserInputService.TextBoxFocused)) do
 --   		v:Disable() 
 --	end	
